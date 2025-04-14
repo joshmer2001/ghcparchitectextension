@@ -1,4 +1,3 @@
-
 using Microsoft.AspNetCore.Mvc;
 using Octokit;
 using System.Diagnostics;
@@ -25,48 +24,136 @@ app.MapGet("/callback", () => "You can close this now");
 app.MapPost("/", async ([FromHeader(Name = "X-GitHub-Token")] string githubToken, 
     [FromBody] Payload payload) =>
     {
-        Console.WriteLine(payload);
-
-        var octokitClient = 
-            new GitHubClient(new Octokit.ProductHeaderValue(appName))
+        try
         {
-            Credentials = new Credentials(githubToken)
-        };
-        var user = await octokitClient.User.Current();
-        Console.WriteLine($"User: {user.Login}");
+            Console.WriteLine("Received payload:");
+            Console.WriteLine(payload);
 
+            GitHubClient octokitClient;
+            try
+            {
+                octokitClient = new GitHubClient(new Octokit.ProductHeaderValue(appName))
+                {
+                    Credentials = new Credentials(githubToken)
+                };
+                Console.WriteLine("GitHub client initialized.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error initializing GitHub client: {ex.Message}");
+                return Results.Problem($"Error initializing GitHub client: {ex.Message}");
+            }
 
-        var httpClient = new HttpClient();
-        httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", githubToken);
-        payload.Stream = true;
-        
-        string key = Environment.GetEnvironmentVariable("AZURE_OPENAI_KEY");
-        string azureOpenAIEndpoint = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
-        string azureOpenAIModel = Environment.GetEnvironmentVariable("AZURE_OPENAI_MODEL");
-        AzureOpenAIClient azureClient = new(
-            new Uri(azureOpenAIEndpoint),
-            new ApiKeyCredential(key));
-        ChatClient chatClient = azureClient.GetChatClient(azureOpenAIModel);
-        
-        payload.Messages.Insert(0, new Message
+            Octokit.User user;
+            try
+            {
+                user = await octokitClient.User.Current();
+                Console.WriteLine($"User retrieved: {user.Login}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error retrieving GitHub user: {ex.Message}");
+                return Results.Problem($"Error retrieving GitHub user: {ex.Message}");
+            }
+
+            HttpClient httpClient;
+            try
+            {
+                httpClient = new HttpClient();
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", githubToken);
+                Console.WriteLine("HTTP client initialized.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error initializing HTTP client: {ex.Message}");
+                return Results.Problem($"Error initializing HTTP client: {ex.Message}");
+            }
+
+            payload.Stream = true;
+
+            string key, azureOpenAIEndpoint, azureOpenAIModel;
+            try
+            {
+                key = Environment.GetEnvironmentVariable("AZURE_OPENAI_KEY");
+                azureOpenAIEndpoint = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
+                azureOpenAIModel = Environment.GetEnvironmentVariable("AZURE_OPENAI_MODEL");
+
+                if (string.IsNullOrEmpty(key) || string.IsNullOrEmpty(azureOpenAIEndpoint) || string.IsNullOrEmpty(azureOpenAIModel))
+                {
+                    throw new Exception("One or more required environment variables are missing.");
+                }
+
+                Console.WriteLine("Environment variables retrieved.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error retrieving environment variables: {ex.Message}");
+                return Results.Problem($"Error retrieving environment variables: {ex.Message}");
+            }
+
+            AzureOpenAIClient azureClient;
+            ChatClient chatClient;
+            try
+            {
+                azureClient = new AzureOpenAIClient(new Uri(azureOpenAIEndpoint), new ApiKeyCredential(key));
+                chatClient = azureClient.GetChatClient(azureOpenAIModel);
+                Console.WriteLine("Azure OpenAI client initialized.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error initializing Azure OpenAI client: {ex.Message}");
+                return Results.Problem($"Error initializing Azure OpenAI client: {ex.Message}");
+            }
+
+            try
+            {
+                payload.Messages.Insert(0, new Message
+                {
+                    Role = "system",
+                    Content = $"You are talking to {user.Login}."
+                });
+                Console.WriteLine("System message added to payload.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error modifying payload: {ex.Message}");
+                return Results.Problem($"Error modifying payload: {ex.Message}");
+            }
+
+            ChatCompletion completion;
+            try
+            {
+                completion = chatClient.CompleteChat(
+                    payload.Messages
+                        .Where(message => message.Role == "user")
+                        .Select(message => new UserChatMessage(message.Content))
+                        .ToList()
+                );
+                Console.WriteLine("Chat completion retrieved.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error completing chat: {ex.Message}");
+                return Results.Problem($"Error completing chat: {ex.Message}");
+            }
+
+            try
+            {
+                var responseStream = completion.Content[0];
+                Console.WriteLine($"Response: {completion.Content[0].Text}");
+                return Results.Ok(responseStream);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error processing response: {ex.Message}");
+                return Results.Problem($"Error processing response: {ex.Message}");
+            }
+        }
+        catch (Exception ex)
         {
-            Role = "system",
-            Content = $"You are talking to {user.Login}."
-        });
-
-        ChatCompletion completion = chatClient.CompleteChat(
-            payload.Messages
-                .Where(message => message.Role == "user")
-                .Select(message => new UserChatMessage(message.Content))
-                .ToList()
-        );
-
-        var responseStream = completion.Content[0];
-
-        Console.WriteLine(completion.Content[0].Text);
-
-        Console.WriteLine($"{completion.Role}: {completion.Content[0].Text}");
-        return Results.Ok(responseStream);
+            Console.WriteLine($"Unexpected error: {ex.Message}");
+            return Results.Problem($"Unexpected error: {ex.Message}");
+        }
     }
 );
 
