@@ -17,7 +17,7 @@ using Microsoft.AspNetCore.SignalR.Protocol;
 var builder = WebApplication.CreateBuilder(args);
 var app = builder.Build();
 
-string appName = "Architect Copilot GHCP";
+string appName = "ArchitectCopilotGHCP";
 
 app.MapGet("/info", () => "Hello Copilot");
 app.MapGet("/callback", () => "You can close this now");
