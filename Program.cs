@@ -22,7 +22,7 @@ string appName = "Architect Copilot GHCP";
 
 app.MapGet("/info", () => "Hello Copilot");
 app.MapGet("/callback", () => "You can close this now");
-app.MapGet("/", async ([FromHeader(Name = "X-GitHub-Token")] string githubToken, 
+app.MapPost("/", async ([FromHeader(Name = "X-GitHub-Token")] string githubToken, 
     [FromBody] Payload payload) =>
     {
         Console.WriteLine(payload);
