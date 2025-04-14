@@ -6,6 +6,7 @@ using Azure.AI.OpenAI;
 using Azure.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions;
+using Microsoft.Extensions.Logging;
 using Azure.AI.OpenAI;
 using Azure.Identity;
 using System.ClientModel;
@@ -19,7 +20,17 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddDebug();
+builder.Services.AddOpenApi();
+builder.Services.AddHttpClient(); 
+builder.Services.AddControllers(); 
+
 var app = builder.Build();
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+}
+app.UseHttpsRedirection();
+app.MapControllers();
 
 string appName = "ArchitectCopilotGHCP";
 
