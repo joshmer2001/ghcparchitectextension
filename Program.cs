@@ -15,6 +15,10 @@ using Microsoft.AspNetCore.SignalR.Protocol;
 
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
 var app = builder.Build();
 
 string appName = "ArchitectCopilotGHCP";
