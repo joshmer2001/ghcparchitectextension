@@ -160,10 +160,11 @@ app.MapPost("/", async ([FromHeader(Name = "X-GitHub-Token")] string githubToken
                     {
                         foreach (ChatMessageContentPart contentPart in completionUpdate.ContentUpdate)
                         {
-                            return Results.Ok(contentPart.Text);
+                            responseContent.Add(contentPart.Text);
+                        }
                     }
-                    
-                }}
+                    return Results.Json(responseContent);
+                }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"Error processing response: {ex.Message}");
