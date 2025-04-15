@@ -135,34 +135,50 @@ app.MapPost("/", async ([FromHeader(Name = "X-GitHub-Token")] string githubToken
                 return Results.Problem($"Error modifying payload: {ex.Message}");
             }
 
-            ChatCompletion completion;
+            AsyncCollectionResult<StreamingChatCompletionUpdate> completion;
             try
             {
-                completion = chatClient.CompleteChat(
-                    payload.Messages
-                        .Where(message => message.Role == "user")
-                        .Select(message => new UserChatMessage(message.Content))
-                        .ToList()
+                completion = chatClient.CompleteChatStreamingAsync(
+                payload.Messages
+                    .Select<Message, ChatMessage>(message =>
+                        message.Role switch
+                        {
+                            "user" => new UserChatMessage(message.Content),
+                            "system" => new SystemChatMessage(message.Content),
+                            "assistant" => new AssistantChatMessage(message.Content),
+                            _ => throw new InvalidOperationException($"Unknown role: {message.Role}")
+                        }
+                    )
+                    .ToList()
+
                 );
                 Console.WriteLine("Chat completion retrieved.");
+            
+                try{
+
+                    await foreach (StreamingChatCompletionUpdate completionUpdate in completion)
+                    {
+                        foreach (ChatMessageContentPart contentPart in completionUpdate.ContentUpdate)
+                        {
+                            return Results.Ok(contentPart.Text);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error processing response: {ex.Message}");
+                    return Results.Problem($"Error processing response: {ex.Message}");
+                }
             }
+            
             catch (Exception ex)
             {
                 Console.WriteLine($"Error completing chat: {ex.Message}");
                 return Results.Problem($"Error completing chat: {ex.Message}");
             }
 
-            try
-            {
-                var responseStream = completion.Content[0];
-                Console.WriteLine($"Response: {completion.Content[0].Text}");
-                return Results.Ok(responseStream);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error processing response: {ex.Message}");
-                return Results.Problem($"Error processing response: {ex.Message}");
-            }
+            Console.WriteLine("No valid response generated.");
+            return Results.Problem("No valid response generated.");
         }
         catch (Exception ex)
         {
