@@ -155,17 +155,17 @@ app.MapPost("/", async ([FromHeader(Name = "X-GitHub-Token")] string githubToken
                 Console.WriteLine("Chat completion retrieved.");
             
                 try{
-
+                    var responseContent = new List<string>();
                     await foreach (StreamingChatCompletionUpdate completionUpdate in completion)
                     {
-                        // foreach (ChatMessageContentPart contentPart in completionUpdate.ContentUpdate)
-                        // {
-                            return Results.Ok(completionUpdate.ContentUpdate.ToString);
-                        // }
+                        foreach (ChatMessageContentPart contentPart in completionUpdate.ContentUpdate)
+                        {
+                            responseContent.Add(contentPart.ToString());
+                        }
                     }
+                    return Results.Json(responseContent);
                 }
                 catch (Exception ex)
-                {
                     Console.WriteLine($"Error processing response: {ex.Message}");
                     return Results.Problem($"Error processing response: {ex.Message}");
                 }
