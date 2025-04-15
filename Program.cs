@@ -153,23 +153,33 @@ app.MapPost("/", async ([FromHeader(Name = "X-GitHub-Token")] string githubToken
 
                 );
                 Console.WriteLine("Chat completion retrieved.");
-            
-                try{
-                    var responseContent = new List<string>();
-                    await foreach (StreamingChatCompletionUpdate completionUpdate in completion)
-                    {
-                        foreach (ChatMessageContentPart contentPart in completionUpdate.ContentUpdate)
-                        {
-                            responseContent.Add(contentPart.Text);
-                        }
-                    }
-                    return Results.Json(responseContent);
-                }
-                catch (Exception ex)
+                return Results.Stream(async (responseStream) =>
                 {
-                    Console.WriteLine($"Error processing response: {ex.Message}");
-                    return Results.Problem($"Error processing response: {ex.Message}");
+                await foreach (var completionUpdate in completion)
+                {
+                    var json = System.Text.Json.JsonSerializer.Serialize(completionUpdate);
+                    var buffer = System.Text.Encoding.UTF8.GetBytes(json + "\n");
+                    await responseStream.WriteAsync(buffer, 0, buffer.Length);
+                    await responseStream.FlushAsync(); // Ensure data is sent immediately
                 }
+                }   , "application/json"); // Set the content type to JSON
+                
+                // try{
+                //     var responseContent = new List<string>();
+                //     await foreach (StreamingChatCompletionUpdate completionUpdate in completion)
+                //     {
+                //         foreach (ChatMessageContentPart contentPart in completionUpdate.ContentUpdate)
+                //         {
+                //             responseContent.Add(contentPart.Text);
+                //         }
+                //     }
+                //     return Results.Json(responseContent);
+                // }
+                // catch (Exception ex)
+                // {
+                //     Console.WriteLine($"Error processing response: {ex.Message}");
+                //     return Results.Problem($"Error processing response: {ex.Message}");
+                // }
             }
             
             catch (Exception ex)
