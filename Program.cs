@@ -158,10 +158,10 @@ app.MapPost("/", async ([FromHeader(Name = "X-GitHub-Token")] string githubToken
 
                     await foreach (StreamingChatCompletionUpdate completionUpdate in completion)
                     {
-                        foreach (ChatMessageContentPart contentPart in completionUpdate.ContentUpdate)
-                        {
-                            return Results.Ok(contentPart.Text);
-                        }
+                        // foreach (ChatMessageContentPart contentPart in completionUpdate.ContentUpdate)
+                        // {
+                            return Results.Ok(completionUpdate.ContentUpdate.ToString);
+                        // }
                     }
                 }
                 catch (Exception ex)
