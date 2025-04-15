@@ -166,6 +166,7 @@ app.MapPost("/", async ([FromHeader(Name = "X-GitHub-Token")] string githubToken
                     return Results.Json(responseContent);
                 }
                 catch (Exception ex)
+                {
                     Console.WriteLine($"Error processing response: {ex.Message}");
                     return Results.Problem($"Error processing response: {ex.Message}");
                 }
